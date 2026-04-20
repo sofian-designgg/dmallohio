@@ -1,0 +1,23 @@
+{
+  "bot_token": "TON_BOT_TOKEN_ICI",
+  "tokens": [],
+  "message": "",
+  "embed": {
+    "enabled": false,
+    "title": "",
+    "description": "",
+    "color": 5814783,
+    "footer": "",
+    "image_url": "",
+    "thumbnail_url": ""
+  },
+  "user_ids": [],
+  "ignore_ids": [],
+  "dm_options": {
+    "delay": 1.5,
+    "stop_on_error": false,
+    "max_errors": 10
+  },
+  "status": "",
+  "authorized_users": []
+}
