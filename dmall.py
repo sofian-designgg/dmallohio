@@ -2,6 +2,8 @@ import discord
 import asyncio
 from datetime import datetime
 
+CONNECT_TIMEOUT = 30  # secondes max pour qu'un bot se connecte
+
 def _resolve_vars(text: str, user: discord.User) -> str:
     """Replace {user}, {user.id}, {timestamp} variables."""
     now = datetime.now().strftime("%d/%m/%Y %H:%M")
@@ -44,10 +46,10 @@ def _progress_embed(sent: int, errors: int, total: int, token_idx: int, total_to
         description=f"**Statut :** {status}",
         color=0x5865F2
     )
-    embed.add_field(name="📊 Progression",   value=f"`[{bar}]` **{pct}%**\n`{sent + errors}/{total}` traités", inline=False)
-    embed.add_field(name="✅ DMs envoyés",   value=f"**{sent}**",                       inline=True)
-    embed.add_field(name="❌ Erreurs",       value=f"**{errors}**",                     inline=True)
-    embed.add_field(name="🤖 Token actif",   value=f"**{token_idx}/{total_tokens}**",   inline=True)
+    embed.add_field(name="📊 Progression", value=f"`[{bar}]` **{pct}%**\n`{sent + errors}/{total}` traités", inline=False)
+    embed.add_field(name="✅ DMs envoyés", value=f"**{sent}**",                     inline=True)
+    embed.add_field(name="❌ Erreurs",     value=f"**{errors}**",                   inline=True)
+    embed.add_field(name="🤖 Token actif", value=f"**{token_idx}/{total_tokens}**", inline=True)
     embed.set_footer(text=f"MultiDmall by SofianDev • {datetime.now().strftime('%H:%M:%S')}")
     return embed
 
@@ -58,7 +60,6 @@ async def _safe_edit(msg: discord.Message, embed: discord.Embed):
         pass
 
 async def _notify(interaction: discord.Interaction, embed: discord.Embed):
-    """Send a followup notification silently."""
     try:
         await interaction.followup.send(embed=embed, silent=True)
     except Exception:
@@ -70,23 +71,25 @@ async def _token_worker(token: str, cfg: dict, idx: int,
                         interaction: discord.Interaction,
                         progress_msg: discord.Message,
                         shared: dict, lock: asyncio.Lock) -> dict:
-    client = discord.Client()
-    res = {"sent": 0, "errors": 0}
-    ignore = set(cfg.get("ignore_ids", []))
-    delay  = cfg["dm_options"]["delay"]
-    max_e  = cfg["dm_options"]["max_errors"]
-    total  = len(cfg.get("user_ids", []))
+
+    intents = discord.Intents.default()
+    client  = discord.Client(intents=intents)
+    res     = {"sent": 0, "errors": 0}
+    ignore  = set(cfg.get("ignore_ids", []))
+    delay   = cfg["dm_options"]["delay"]
+    max_e   = cfg["dm_options"]["max_errors"]
+    total   = len(cfg.get("user_ids", []))
     total_tokens = len(cfg.get("tokens", []))
-    connected = False  # track if on_ready actually fired
+    ready_event  = asyncio.Event()  # sera set() dans on_ready
 
     @client.event
     async def on_ready():
-        nonlocal res, connected
-        connected = True
+        nonlocal res
+        ready_event.set()  # signaler que le bot est connecté
         async with lock:
             shared["connected"] += 1
 
-        # ✅ Notify Discord: bot is now online
+        # ✅ Notifier Discord : bot en ligne
         connect_embed = discord.Embed(
             title="🟢 Bot connecté",
             description=f"**Bot {idx+1}** est en ligne : `{client.user}` (`{client.user.id}`)\n"
@@ -111,14 +114,13 @@ async def _token_worker(token: str, cfg: dict, idx: int,
                 res["errors"] += 1
                 async with lock:
                     shared["errors"] += 1
-                print(f"[Bot {idx+1}] ⚠️ Bloqué/banni → {uid}")
+                print(f"[Bot {idx+1}] ⚠️ Bloqué → {uid}")
             except Exception as e:
                 res["errors"] += 1
                 async with lock:
                     shared["errors"] += 1
                 print(f"[Bot {idx+1}] ❌ {uid}: {e}")
 
-            # Update progress embed every 5 messages
             async with lock:
                 shared["processed"] += 1
                 if shared["processed"] % 5 == 0 or shared["processed"] == total:
@@ -134,8 +136,30 @@ async def _token_worker(token: str, cfg: dict, idx: int,
             await asyncio.sleep(delay)
         await client.close()
 
+    # Lancer client.start() en tâche de fond
+    start_task = asyncio.create_task(client.start(token, bot=True))
+
     try:
-        await client.start(token, bot=True)   # bot=True : compte d'application Discord
+        # Attendre que on_ready soit déclenché (max CONNECT_TIMEOUT sec)
+        await asyncio.wait_for(ready_event.wait(), timeout=CONNECT_TIMEOUT)
+        # Attendre que le worker finisse d'envoyer tous les DMs
+        await start_task
+    except asyncio.TimeoutError:
+        async with lock:
+            shared["banned_tokens"].append(idx + 1)
+        print(f"[Bot {idx+1}] ⏱️ TIMEOUT — pas connecté après {CONNECT_TIMEOUT}s")
+        err_embed = discord.Embed(
+            title="⏱️ Timeout — Bot non connecté",
+            description=f"**Bot {idx+1}** n'a pas répondu après **{CONNECT_TIMEOUT} secondes**.\n"
+                        f"> Token invalide, bot désactivé dans le portail développeur, ou réseau inaccessible.",
+            color=0xFEE75C
+        )
+        err_embed.set_footer(text=f"MultiDmall • {datetime.now().strftime('%H:%M:%S')}")
+        await _notify(interaction, err_embed)
+        start_task.cancel()
+        try: await client.close()
+        except: pass
+        res["errors"] += 1
     except discord.LoginFailure as e:
         async with lock:
             shared["banned_tokens"].append(idx + 1)
@@ -143,7 +167,7 @@ async def _token_worker(token: str, cfg: dict, idx: int,
         err_embed = discord.Embed(
             title="🔴 Token invalide",
             description=f"**Bot {idx+1}** — token refusé par Discord.\n"
-                        f"> `{e}`\n\n*Vérifiez que le token est correct et que le bot n'est pas banni.*",
+                        f"> `{e}`\n\n*Vérifiez le token dans le portail développeur Discord.*",
             color=0xED4245
         )
         err_embed.set_footer(text=f"MultiDmall • {datetime.now().strftime('%H:%M:%S')}")
@@ -163,17 +187,19 @@ async def _token_worker(token: str, cfg: dict, idx: int,
         await _notify(interaction, err_embed)
         res["errors"] += 1
     except Exception as e:
+        async with lock:
+            shared["banned_tokens"].append(idx + 1)
         print(f"[Bot {idx+1}] ❌ Erreur inattendue : {e}")
         err_embed = discord.Embed(
             title="🔴 Erreur inattendue",
-            description=f"**Bot {idx+1}** a planté avant de se connecter.\n> `{type(e).__name__}: {e}`",
+            description=f"**Bot {idx+1}** a planté.\n> `{type(e).__name__}: {e}`",
             color=0xED4245
         )
         err_embed.set_footer(text=f"MultiDmall • {datetime.now().strftime('%H:%M:%S')}")
         await _notify(interaction, err_embed)
         res["errors"] += 1
 
-    if not connected:
+    if not ready_event.is_set():
         async with lock:
             if idx + 1 not in shared["banned_tokens"]:
                 shared["banned_tokens"].append(idx + 1)
@@ -186,8 +212,7 @@ async def run_normal(cfg: dict, interaction: discord.Interaction):
     shared = {"sent": 0, "errors": 0, "processed": 0, "banned_tokens": [], "connected": 0}
     lock   = asyncio.Lock()
 
-    # Initial progress embed
-    init_embed = _progress_embed(0, 0, total_ids * total_tokens, 1, total_tokens, "🚀 Connexion des bots...")
+    init_embed = _progress_embed(0, 0, total_ids * total_tokens, 1, total_tokens, f"🚀 Connexion des bots... (max {CONNECT_TIMEOUT}s)")
     progress_msg = await interaction.followup.send(embed=init_embed)
 
     results = await asyncio.gather(*[
@@ -195,7 +220,6 @@ async def run_normal(cfg: dict, interaction: discord.Interaction):
         for i, t in enumerate(cfg["tokens"])
     ])
 
-    # ❌ Abort if no bot connected at all
     if shared["connected"] == 0:
         abort_embed = discord.Embed(
             title="❌ DMall annulé — Aucun bot connecté",
@@ -219,28 +243,31 @@ async def run_eco(cfg: dict, interaction: discord.Interaction):
     total_sent, total_errors = 0, 0
     idx = 0
     banned_tokens = []
-    total_users = len(user_ids)
+    total_users  = len(user_ids)
     total_tokens = len(tokens)
+    any_connected = False
 
-    # Initial progress embed
-    init_embed = _progress_embed(0, 0, total_users, 1, total_tokens, "🚀 Connexion du premier bot (mode Éco)...")
+    init_embed = _progress_embed(0, 0, total_users, 1, total_tokens, f"🚀 Connexion du premier bot... (max {CONNECT_TIMEOUT}s)")
     progress_msg = await interaction.followup.send(embed=init_embed)
 
     while user_ids and idx < len(tokens):
         token = tokens[idx]
-        client = discord.Client()
-        remaining = []
+        intents = discord.Intents.default()
+        client  = discord.Client(intents=intents)
+        remaining    = []
         token_banned = False
+        ready_event  = asyncio.Event()
 
         @client.event
         async def on_ready(token_idx=idx):
-            nonlocal total_sent, total_errors, token_banned
+            nonlocal total_sent, total_errors, token_banned, any_connected
+            ready_event.set()
+            any_connected = True
 
-            # ✅ Notify Discord: bot is now online
             connect_embed = discord.Embed(
                 title="🟢 Bot connecté",
                 description=f"**Bot {token_idx+1}** est en ligne : `{client.user}` (`{client.user.id}`)\n"
-                            f"Reprise de l'envoi — **{len(user_ids)}** cibles restantes...",
+                            f"Envoi vers **{len(user_ids)}** cibles restantes...",
                 color=0x57F287
             )
             connect_embed.set_footer(text=f"MultiDmall • {datetime.now().strftime('%H:%M:%S')}")
@@ -261,8 +288,8 @@ async def run_eco(cfg: dict, interaction: discord.Interaction):
                     print(f"[Eco Bot {token_idx+1}] 🚫 BANNI — switch vers Bot {token_idx+2}")
                     ban_embed = discord.Embed(
                         title="🚫 Bot banni — Switch automatique",
-                        description=f"Le **Bot {token_idx+1}** (`{client.user}`) a été banni/bloqué.\n"
-                                    f"➡️ Passage au **Bot {token_idx+2}** avec `{len(remaining)}` cibles restantes...",
+                        description=f"**Bot {token_idx+1}** (`{client.user}`) banni/bloqué.\n"
+                                    f"➡️ Passage au **Bot {token_idx+2}** — `{len(remaining)}` cibles restantes...",
                         color=0xED4245
                     )
                     ban_embed.set_footer(text=f"MultiDmall • {datetime.now().strftime('%H:%M:%S')}")
@@ -272,7 +299,6 @@ async def run_eco(cfg: dict, interaction: discord.Interaction):
                     total_errors += 1
                     print(f"[Eco Bot {token_idx+1}] ❌ {uid}: {e}")
 
-                # Update progress every 5 DMs
                 if (total_sent + total_errors) % 5 == 0 or (total_sent + total_errors) == total_users:
                     embed = _progress_embed(
                         total_sent, total_errors, total_users,
@@ -284,15 +310,32 @@ async def run_eco(cfg: dict, interaction: discord.Interaction):
                 await asyncio.sleep(delay)
             await client.close()
 
+        start_task = asyncio.create_task(client.start(token, bot=True))
+
         try:
-            await client.start(token, bot=True)   # bot=True : compte d'application Discord
+            await asyncio.wait_for(ready_event.wait(), timeout=CONNECT_TIMEOUT)
+            await start_task
+        except asyncio.TimeoutError:
+            banned_tokens.append(idx + 1)
+            print(f"[Eco Bot {idx+1}] ⏱️ TIMEOUT — pas connecté après {CONNECT_TIMEOUT}s")
+            err_embed = discord.Embed(
+                title="⏱️ Timeout — Bot non connecté",
+                description=f"**Bot {idx+1}** n'a pas répondu après **{CONNECT_TIMEOUT} secondes**.\n"
+                            f"> Token invalide ou bot désactivé dans le portail développeur.",
+                color=0xFEE75C
+            )
+            err_embed.set_footer(text=f"MultiDmall • {datetime.now().strftime('%H:%M:%S')}")
+            await _notify(interaction, err_embed)
+            start_task.cancel()
+            try: await client.close()
+            except: pass
+            idx += 1; continue
         except discord.LoginFailure as e:
             banned_tokens.append(idx + 1)
             print(f"[Eco Bot {idx+1}] 🚫 TOKEN INVALIDE : {e}")
             err_embed = discord.Embed(
                 title="🔴 Token invalide",
-                description=f"**Bot {idx+1}** — token refusé par Discord.\n"
-                            f"> `{e}`\n\n*Vérifiez le token ou remplacez-le dans le panel.*",
+                description=f"**Bot {idx+1}** — token refusé.\n> `{e}`",
                 color=0xED4245
             )
             err_embed.set_footer(text=f"MultiDmall • {datetime.now().strftime('%H:%M:%S')}")
@@ -303,8 +346,7 @@ async def run_eco(cfg: dict, interaction: discord.Interaction):
             print(f"[Eco Bot {idx+1}] 🚫 ERREUR HTTP : {e}")
             err_embed = discord.Embed(
                 title="🔴 Erreur de connexion (HTTP)",
-                description=f"**Bot {idx+1}** — Discord a rejeté la connexion.\n"
-                            f"> Code `{e.status}` : `{e.text}`",
+                description=f"**Bot {idx+1}** — Discord a rejeté la connexion.\n> Code `{e.status}` : `{e.text}`",
                 color=0xED4245
             )
             err_embed.set_footer(text=f"MultiDmall • {datetime.now().strftime('%H:%M:%S')}")
@@ -315,7 +357,7 @@ async def run_eco(cfg: dict, interaction: discord.Interaction):
             print(f"[Eco Bot {idx+1}] ❌ Erreur inattendue : {e}")
             err_embed = discord.Embed(
                 title="🔴 Erreur inattendue",
-                description=f"**Bot {idx+1}** a planté avant de se connecter.\n> `{type(e).__name__}: {e}`",
+                description=f"**Bot {idx+1}** a planté.\n> `{type(e).__name__}: {e}`",
                 color=0xED4245
             )
             err_embed.set_footer(text=f"MultiDmall • {datetime.now().strftime('%H:%M:%S')}")
@@ -328,8 +370,7 @@ async def run_eco(cfg: dict, interaction: discord.Interaction):
         else:
             break
 
-    # ❌ Abort if no DMs were sent at all (no bot connected)
-    if total_sent == 0 and len(banned_tokens) == total_tokens:
+    if not any_connected:
         abort_embed = discord.Embed(
             title="❌ DMall annulé — Aucun bot connecté",
             description=f"Aucun des **{total_tokens}** bot(s) n'a pu se connecter.\n"
@@ -350,21 +391,19 @@ async def _send_result(interaction: discord.Interaction, results: list, cfg: dic
     sent   = sum(r["sent"]   for r in results)
     errors = sum(r["errors"] for r in results)
 
-    # Update progress message to "Terminé"
     if progress_msg:
         total = len(cfg.get("user_ids", [])) * max(1, len(cfg.get("tokens", [])))
         done_embed = _progress_embed(sent, errors, total, len(cfg["tokens"]), len(cfg["tokens"]), "✅ Terminé !")
         done_embed.color = 0x57F287 if errors == 0 else 0xFEE75C
         await _safe_edit(progress_msg, done_embed)
 
-    # Final result embed
     embed = discord.Embed(
         title="🏁 DMall Terminé",
         color=0x57F287 if errors == 0 else 0xED4245
     )
-    embed.add_field(name="✅ DMs envoyés",     value=f"**{sent}**",               inline=True)
-    embed.add_field(name="❌ Erreurs",         value=f"**{errors}**",             inline=True)
-    embed.add_field(name="🤖 Bots utilisés",  value=f"**{len(cfg['tokens'])}**", inline=True)
+    embed.add_field(name="✅ DMs envoyés",    value=f"**{sent}**",               inline=True)
+    embed.add_field(name="❌ Erreurs",        value=f"**{errors}**",             inline=True)
+    embed.add_field(name="🤖 Bots utilisés", value=f"**{len(cfg['tokens'])}**", inline=True)
 
     if banned_tokens:
         embed.add_field(
