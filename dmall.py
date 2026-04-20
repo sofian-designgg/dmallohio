@@ -137,7 +137,7 @@ async def _token_worker(token: str, cfg: dict, idx: int,
         await client.close()
 
     # Lancer client.start() en tâche de fond
-    start_task = asyncio.create_task(client.start(token, bot=True))
+    start_task = asyncio.create_task(client.start(token))
 
     try:
         # Attendre que on_ready soit déclenché (max CONNECT_TIMEOUT sec)
@@ -310,7 +310,7 @@ async def run_eco(cfg: dict, interaction: discord.Interaction):
                 await asyncio.sleep(delay)
             await client.close()
 
-        start_task = asyncio.create_task(client.start(token, bot=True))
+        start_task = asyncio.create_task(client.start(token))
 
         try:
             await asyncio.wait_for(ready_event.wait(), timeout=CONNECT_TIMEOUT)
