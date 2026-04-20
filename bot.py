@@ -20,7 +20,9 @@ class MultiBot(discord.Client):
 
     async def on_ready(self):
         print(f"[MultiBot] Connecté : {self.user} ({self.user.id})")
-        await self.change_presence(activity=discord.Game(name="/dmall"))
+        await self.change_presence(
+            activity=discord.Streaming(name="ohio on top", url="https://twitch.tv/ohio")
+        )
 
 bot = MultiBot()
 
