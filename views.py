@@ -353,13 +353,21 @@ class DMallTypeView(ui.View):
     @ui.button(label="DMall Normal",    style=discord.ButtonStyle.primary, custom_id="dt_normal", row=0)
     async def normal(self, i: discord.Interaction, b: ui.Button):
         from dmall import run_normal
-        await i.response.send_message(f"🚀 **DMall Normal** lancé ! `{len(self.cfg['tokens'])}` token(s) → `{len(self.cfg['user_ids'])}` cibles", ephemeral=True)
+        await i.response.defer()  # defer so followup works for progress embeds
+        await i.followup.send(
+            f"🚀 **DMall Normal** lancé — `{len(self.cfg['tokens'])}` token(s) → `{len(self.cfg['user_ids'])}` cibles\n"
+            f"*(Les bots vont se connecter et commencer l'envoi...)*"
+        )
         asyncio.create_task(run_normal(self.cfg, i))
 
     @ui.button(label="DMall Eco ⭐",   style=discord.ButtonStyle.danger,   custom_id="dt_eco",    row=0)
     async def eco(self, i: discord.Interaction, b: ui.Button):
         from dmall import run_eco
-        await i.response.send_message(f"🚀 **DMall Eco** lancé !", ephemeral=True)
+        await i.response.defer()  # defer so followup works for progress embeds
+        await i.followup.send(
+            f"🚀 **DMall Eco** lancé — `{len(self.cfg['tokens'])}` token(s) → `{len(self.cfg['user_ids'])}` cibles\n"
+            f"*(Mode Éco : 1 bot à la fois, switch automatique si banni)*"
+        )
         asyncio.create_task(run_eco(self.cfg, i))
 
     @ui.button(label="DMall Custom ⭐", style=discord.ButtonStyle.danger,   custom_id="dt_custom", row=0)
