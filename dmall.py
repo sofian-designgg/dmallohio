@@ -50,7 +50,7 @@ def _progress_embed(sent: int, errors: int, total: int, token_idx: int, total_to
     embed.add_field(name="✅ DMs envoyés", value=f"**{sent}**",                     inline=True)
     embed.add_field(name="❌ Erreurs",     value=f"**{errors}**",                   inline=True)
     embed.add_field(name="🤖 Token actif", value=f"**{token_idx}/{total_tokens}**", inline=True)
-    embed.set_footer(text=f"MultiDmall by SofianDev • {datetime.now().strftime('%H:%M:%S')}")
+    embed.set_footer(text=f"ohiodmall by ohio • {datetime.now().strftime('%H:%M:%S')}")
     return embed
 
 async def _safe_edit(msg: discord.Message, embed: discord.Embed):
@@ -412,7 +412,7 @@ async def _send_result(interaction: discord.Interaction, results: list, cfg: dic
             inline=False
         )
 
-    embed.set_footer(text=f"MultiDmall by SofianDev • {datetime.now().strftime('%H:%M:%S')}")
+    embed.set_footer(text=f"ohiodmall by ohio • {datetime.now().strftime('%H:%M:%S')}")
     try:
         await interaction.followup.send(embed=embed)
     except Exception:

@@ -1,4 +1,4 @@
 @echo off
-title MultiDmall by SofianDev
+title ohiodmall by ohio
 python main.py
 pause
