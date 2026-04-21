@@ -31,7 +31,7 @@ async def send_config_panel(interaction: discord.Interaction):
         separator(divider=False),
         section(f"📩 **Message**\n{msg_val}",           button("📩 Message",      "cv_message", style=3)),
         separator(divider=False),
-        section(f"📝 **Embed**\n{emb_val}",             button("📝 Embed",        "cv_message", style=2)),
+        section(f"📝 **Embed**\n{emb_val}",             button("📝 Embed",        "cv_embed",   style=2)),
         separator(),
         section(f"⚙️ **Options de DM** — Délai : **{delay}s**", button("⚙️ Options",   "cv_dmopts",  style=2)),
         separator(divider=False),
@@ -69,6 +69,11 @@ class ConfigView(ui.View):
     async def btn_message(self, i: discord.Interaction, b: ui.Button):
         if not await self._check(i): return
         await send_message_panel(i)
+
+    @ui.button(label="📝 Embed",          style=discord.ButtonStyle.secondary, custom_id="cv_embed",    row=0)
+    async def btn_embed(self, i: discord.Interaction, b: ui.Button):
+        if not await self._check(i): return
+        await send_embed_builder_panel(i)
 
     @ui.button(label="⚙️ Options de DM", style=discord.ButtonStyle.secondary, custom_id="cv_dmopts",   row=1)
     async def btn_dmopts(self, i: discord.Interaction, b: ui.Button):
