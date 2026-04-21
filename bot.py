@@ -2,7 +2,10 @@ import discord
 from discord import app_commands
 import os
 from db import authorized, make_embed, set_field, load
-from views import ConfigView, send_config_panel
+from views import (
+    ConfigView, MessagePanelView, EmbedBuilderView,
+    TargetMethodView, DMallTypeView, send_config_panel
+)
 
 intents = discord.Intents.default()
 intents.members   = True
@@ -15,7 +18,12 @@ class MultiBot(discord.Client):
 
     async def setup_hook(self):
         await self.tree.sync()
+        # Enregistrement de toutes les views persistantes
         self.add_view(ConfigView())
+        self.add_view(MessagePanelView())
+        self.add_view(EmbedBuilderView())
+        self.add_view(TargetMethodView())
+        self.add_view(DMallTypeView())
         print("[MultiBot] Slash commands synchronisées ✅")
 
     async def on_ready(self):

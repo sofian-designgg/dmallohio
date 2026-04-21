@@ -115,7 +115,7 @@ class ConfigView(ui.View):
         if errs:
             await i.response.send_message("\n".join(errs), ephemeral=True)
             return
-        await send_dmall_type_panel(i, cfg)
+        await send_dmall_type_panel(i)
 
 
 # ── Message Panel ─────────────────────────────────────────────────────────────
@@ -152,7 +152,7 @@ async def send_message_panel(interaction: discord.Interaction):
 
 class MessagePanelView(ui.View):
     def __init__(self):
-        super().__init__(timeout=120)
+        super().__init__(timeout=None)
 
     @ui.button(label="✉️ Saisir le Message", style=discord.ButtonStyle.primary,   custom_id="mp_simple",  row=0)
     async def simple(self, i: discord.Interaction, b: ui.Button):
@@ -223,7 +223,7 @@ async def send_embed_builder_panel(interaction: discord.Interaction):
 
 class EmbedBuilderView(ui.View):
     def __init__(self):
-        super().__init__(timeout=120)
+        super().__init__(timeout=None)
 
     @ui.button(label="✏️ Titre",           style=discord.ButtonStyle.primary,   custom_id="eb_title",   row=0)
     async def title(self, i: discord.Interaction, b: ui.Button):
@@ -297,9 +297,8 @@ async def send_targets_panel(interaction: discord.Interaction):
 
 
 class TargetMethodView(ui.View):
-    def __init__(self, guild: discord.Guild | None):
-        super().__init__(timeout=120)
-        self.guild = guild
+    def __init__(self):
+        super().__init__(timeout=None)
 
     @ui.button(label="➕ Ajouter des IDs",   style=discord.ButtonStyle.primary,   custom_id="tm_ids",    row=0)
     async def manual_ids(self, i: discord.Interaction, b: ui.Button):
@@ -427,7 +426,8 @@ class RoleFetchView(ui.View):
 
 # ── DMall Type View ───────────────────────────────────────────────────────────
 
-async def send_dmall_type_panel(interaction: discord.Interaction, cfg: dict):
+async def send_dmall_type_panel(interaction: discord.Interaction):
+    cfg = await load()
     nb_tok = len(cfg.get("tokens", []))
     nb_ids = len(cfg.get("user_ids", []))
     panel = container(
@@ -444,31 +444,33 @@ async def send_dmall_type_panel(interaction: discord.Interaction, cfg: dict):
 
 
 class DMallTypeView(ui.View):
-    def __init__(self, cfg: dict):
-        super().__init__(timeout=120)
-        self.cfg = cfg
+    def __init__(self):
+        super().__init__(timeout=None)
 
     @ui.button(label="DMall Normal",    style=discord.ButtonStyle.primary, custom_id="dt_normal", row=0)
     async def normal(self, i: discord.Interaction, b: ui.Button):
         from dmall import run_normal
+        cfg = await load()
         await i.response.defer()
         await i.followup.send(
-            f"🚀 **DMall Normal** lancé — `{len(self.cfg['tokens'])}` token(s) → `{len(self.cfg['user_ids'])}` cibles\n"
+            f"🚀 **DMall Normal** lancé — `{len(cfg['tokens'])}` token(s) → `{len(cfg['user_ids'])}` cibles\n"
             f"*(Les bots vont se connecter et commencer l'envoi...)*"
         )
-        asyncio.create_task(run_normal(self.cfg, i))
+        asyncio.create_task(run_normal(cfg, i))
 
     @ui.button(label="DMall Eco ⭐",   style=discord.ButtonStyle.danger,   custom_id="dt_eco",    row=0)
     async def eco(self, i: discord.Interaction, b: ui.Button):
         from dmall import run_eco
+        cfg = await load()
         await i.response.defer()
         await i.followup.send(
-            f"🚀 **DMall Eco** lancé — `{len(self.cfg['tokens'])}` token(s) → `{len(self.cfg['user_ids'])}` cibles\n"
+            f"🚀 **DMall Eco** lancé — `{len(cfg['tokens'])}` token(s) → `{len(cfg['user_ids'])}` cibles\n"
             f"*(Mode Éco : 1 bot à la fois, switch automatique si banni)*"
         )
-        asyncio.create_task(run_eco(self.cfg, i))
+        asyncio.create_task(run_eco(cfg, i))
 
     @ui.button(label="DMall Custom ⭐", style=discord.ButtonStyle.danger,   custom_id="dt_custom", row=0)
     async def custom(self, i: discord.Interaction, b: ui.Button):
         from modals import CustomDelayModal
-        await i.response.send_modal(CustomDelayModal(self.cfg))
+        cfg = await load()
+        await i.response.send_modal(CustomDelayModal(cfg))
