@@ -3,6 +3,18 @@ from discord import ui
 import asyncio
 from db import load, save, set_field
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+async def _refresh_config(interaction: discord.Interaction):
+    """Rafraîchit le panel principal en Components V2 après un modal."""
+    from views import send_config_panel
+    await send_config_panel(interaction)
+
+async def _refresh_embed_builder(interaction: discord.Interaction):
+    """Rafraîchit le panel Embed Builder en Components V2 après un modal."""
+    from views import send_embed_builder_panel
+    await send_embed_builder_panel(interaction)
+
 # ── Simple modals ─────────────────────────────────────────────────────────────
 
 class TokensModal(ui.Modal, title="🤖 Ajouter des tokens"):
@@ -10,8 +22,6 @@ class TokensModal(ui.Modal, title="🤖 Ajouter des tokens"):
         style=discord.TextStyle.paragraph, placeholder="token1\ntoken2", required=True, max_length=4000)
 
     async def on_submit(self, interaction: discord.Interaction):
-        from views import ConfigView
-        from db import make_embed
         cfg = await load()
         added = 0
         for t in self.tokens_input.value.split("\n"):
@@ -19,7 +29,7 @@ class TokensModal(ui.Modal, title="🤖 Ajouter des tokens"):
             if t and t not in cfg["tokens"]:
                 cfg["tokens"].append(t); added += 1
         await save(cfg)
-        await interaction.response.edit_message(embed=await make_embed(), view=ConfigView())
+        await _refresh_config(interaction)
         await interaction.followup.send(f"✅ **{added}** token(s) ajouté(s). Total : **{len(cfg['tokens'])}**", ephemeral=True)
 
 class SimpleMessageModal(ui.Modal, title="📩 Saisir le message"):
@@ -29,13 +39,11 @@ class SimpleMessageModal(ui.Modal, title="📩 Saisir le message"):
         required=False, max_length=2000)
 
     async def on_submit(self, interaction: discord.Interaction):
-        from views import ConfigView
-        from db import make_embed
         await set_field("message", self.msg.value.strip())
         await set_field("embed", {"enabled": False, "title": "", "description": "",
                                   "color": 5814783, "footer": "", "image_url": "",
                                   "thumbnail_url": "", "button_label": "", "button_url": ""})
-        await interaction.response.edit_message(embed=await make_embed(), view=ConfigView())
+        await _refresh_config(interaction)
         await interaction.followup.send("✅ Message défini avec succès.", ephemeral=True)
 
 class EmbedJSONModal(ui.Modal, title="📝 Embed JSON"):
@@ -46,8 +54,6 @@ class EmbedJSONModal(ui.Modal, title="📝 Embed JSON"):
 
     async def on_submit(self, interaction: discord.Interaction):
         import json
-        from views import ConfigView
-        from db import make_embed
         try:
             data = json.loads(self.raw.value.strip())
             emb = {
@@ -62,7 +68,7 @@ class EmbedJSONModal(ui.Modal, title="📝 Embed JSON"):
             }
             await set_field("embed", emb)
             await set_field("message", "")
-            await interaction.response.edit_message(embed=await make_embed(), view=ConfigView())
+            await _refresh_config(interaction)
             await interaction.followup.send("✅ Embed JSON importé.", ephemeral=True)
         except Exception as ex:
             await interaction.response.send_message(f"❌ JSON invalide : `{ex}`", ephemeral=True)
@@ -70,12 +76,11 @@ class EmbedJSONModal(ui.Modal, title="📝 Embed JSON"):
 class EmbedTitleModal(ui.Modal, title="✏️ Titre de l'embed"):
     title_in = ui.TextInput(label="Titre", placeholder="Mon super titre", required=False, max_length=256)
     async def on_submit(self, interaction: discord.Interaction):
-        from views import EmbedBuilderView
         cfg = await load()
         cfg["embed"]["title"] = self.title_in.value.strip()
         cfg["embed"]["enabled"] = True
         await save(cfg)
-        await interaction.response.edit_message(view=EmbedBuilderView())
+        await _refresh_embed_builder(interaction)
         await interaction.followup.send(f"✅ Titre : `{self.title_in.value.strip()}`", ephemeral=True)
 
 class EmbedDescModal(ui.Modal, title="📄 Description de l'embed"):
@@ -83,12 +88,11 @@ class EmbedDescModal(ui.Modal, title="📄 Description de l'embed"):
         placeholder="Description...\n\nVariables : {user} {user.id} {timestamp}",
         required=False, max_length=4000)
     async def on_submit(self, interaction: discord.Interaction):
-        from views import EmbedBuilderView
         cfg = await load()
         cfg["embed"]["description"] = self.desc_in.value.strip()
         cfg["embed"]["enabled"] = True
         await save(cfg)
-        await interaction.response.edit_message(view=EmbedBuilderView())
+        await _refresh_embed_builder(interaction)
         await interaction.followup.send("✅ Description définie.", ephemeral=True)
 
 class EmbedColorImageModal(ui.Modal, title="🎨 Couleur & Image"):
@@ -98,7 +102,6 @@ class EmbedColorImageModal(ui.Modal, title="🎨 Couleur & Image"):
     btn_label= ui.TextInput(label="Bouton lien - texte", placeholder="Cliquez ici", required=False, max_length=80)
     btn_url  = ui.TextInput(label="Bouton lien - URL", placeholder="https://...", required=False, max_length=500)
     async def on_submit(self, interaction: discord.Interaction):
-        from views import EmbedBuilderView
         cfg = await load()
         try:
             c = self.color_in.value.strip().lstrip("#")
@@ -110,18 +113,30 @@ class EmbedColorImageModal(ui.Modal, title="🎨 Couleur & Image"):
         cfg["embed"]["button_url"]   = self.btn_url.value.strip()
         cfg["embed"]["enabled"] = True
         await save(cfg)
-        await interaction.response.edit_message(view=EmbedBuilderView())
+        await _refresh_embed_builder(interaction)
         await interaction.followup.send("✅ Couleur & image configurées.", ephemeral=True)
 
 class EmbedThumbnailModal(ui.Modal, title="🖼️ Thumbnail"):
     thumb = ui.TextInput(label="URL du thumbnail", placeholder="https://...", required=False, max_length=500)
     async def on_submit(self, interaction: discord.Interaction):
-        from views import EmbedBuilderView
-        await set_field("embed.thumbnail_url", self.thumb.value.strip())
-        cfg = await load(); cfg["embed"]["thumbnail_url"] = self.thumb.value.strip()
+        cfg = await load()
+        cfg["embed"]["thumbnail_url"] = self.thumb.value.strip()
+        cfg["embed"]["enabled"] = True
         await save(cfg)
-        await interaction.response.edit_message(view=EmbedBuilderView())
+        await _refresh_embed_builder(interaction)
         await interaction.followup.send("✅ Thumbnail défini.", ephemeral=True)
+
+class EmbedButtonModal(ui.Modal, title="🔗 Bouton lien"):
+    btn_label = ui.TextInput(label="Texte du bouton", placeholder="Cliquez ici", required=False, max_length=80)
+    btn_url   = ui.TextInput(label="URL du bouton", placeholder="https://...", required=False, max_length=500)
+    async def on_submit(self, interaction: discord.Interaction):
+        cfg = await load()
+        cfg["embed"]["button_label"] = self.btn_label.value.strip()
+        cfg["embed"]["button_url"]   = self.btn_url.value.strip()
+        cfg["embed"]["enabled"] = True
+        await save(cfg)
+        await _refresh_embed_builder(interaction)
+        await interaction.followup.send("✅ Bouton lien configuré.", ephemeral=True)
 
 class UserIDsModal(ui.Modal, title="➕ Ajouter des User IDs"):
     ids = ui.TextInput(label="User IDs (un par ligne)",
@@ -156,8 +171,6 @@ class IgnoreIDsModal(ui.Modal, title="🚫 IDs à ignorer"):
     ids = ui.TextInput(label="User IDs à ignorer (un par ligne)",
         style=discord.TextStyle.paragraph, placeholder="123456789", required=True, max_length=4000)
     async def on_submit(self, interaction: discord.Interaction):
-        from views import ConfigView
-        from db import make_embed
         cfg = await load()
         added = 0
         for line in self.ids.value.split("\n"):
@@ -166,16 +179,14 @@ class IgnoreIDsModal(ui.Modal, title="🚫 IDs à ignorer"):
                 if uid not in cfg["ignore_ids"]: cfg["ignore_ids"].append(uid); added += 1
             except: pass
         await save(cfg)
-        await interaction.response.edit_message(embed=await make_embed(), view=ConfigView())
+        await _refresh_config(interaction)
         await interaction.followup.send(f"✅ **{added}** ID(s) ignoré(s).", ephemeral=True)
 
 class StatusModal(ui.Modal, title="⭐ Status du selfbot"):
     status = ui.TextInput(label="Status", placeholder="En train de DM...", required=False, max_length=128)
     async def on_submit(self, interaction: discord.Interaction):
-        from views import ConfigView
-        from db import make_embed
         await set_field("status", self.status.value.strip())
-        await interaction.response.edit_message(embed=await make_embed(), view=ConfigView())
+        await _refresh_config(interaction)
         await interaction.followup.send("✅ Status défini.", ephemeral=True)
 
 class DMOptionsModal(ui.Modal, title="⚙️ Options de DM"):
@@ -183,8 +194,6 @@ class DMOptionsModal(ui.Modal, title="⚙️ Options de DM"):
     maxerr = ui.TextInput(label="Nombre max d'erreurs", placeholder="10", required=False, max_length=5)
     stop   = ui.TextInput(label="Stopper si trop d'erreurs ? (oui/non)", placeholder="non", required=False, max_length=5)
     async def on_submit(self, interaction: discord.Interaction):
-        from views import ConfigView
-        from db import make_embed
         cfg = await load()
         try: cfg["dm_options"]["delay"]      = float(self.delay.value or 1.5)
         except: pass
@@ -192,5 +201,5 @@ class DMOptionsModal(ui.Modal, title="⚙️ Options de DM"):
         except: pass
         cfg["dm_options"]["stop_on_error"] = self.stop.value.strip().lower() in ("oui","o","yes","y")
         await save(cfg)
-        await interaction.response.edit_message(embed=await make_embed(), view=ConfigView())
+        await _refresh_config(interaction)
         await interaction.followup.send("✅ Options sauvegardées.", ephemeral=True)
