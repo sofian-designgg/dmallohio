@@ -2,7 +2,7 @@ import discord
 from discord import app_commands
 import os
 from db import authorized, make_embed, set_field, load
-from views import ConfigView
+from views import ConfigView, send_config_panel
 
 intents = discord.Intents.default()
 intents.members   = True
@@ -28,15 +28,12 @@ bot = MultiBot()
 
 # ── Slash commands ─────────────────────────────────────────────────────────────
 
-@bot.tree.command(name="dmall", description="Ouvrir le panel de configuration MultiDmall")
+@bot.tree.command(name="dmall", description="Ouvrir le panel de configuration DMall Ohio")
 async def cmd_dmall(interaction: discord.Interaction):
     if not await authorized(interaction.user.id):
         await interaction.response.send_message("❌ Non autorisé.", ephemeral=True)
         return
-    await interaction.response.send_message(
-        embed=await make_embed(),
-        view=ConfigView()
-    )
+    await send_config_panel(interaction)
 
 @bot.tree.command(name="authorize", description="Autoriser un utilisateur")
 @app_commands.describe(user="L'utilisateur à autoriser")
