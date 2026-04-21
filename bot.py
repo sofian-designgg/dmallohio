@@ -74,6 +74,43 @@ async def cmd_reset(interaction: discord.Interaction):
     await save(copy.deepcopy(DEFAULT))
     await interaction.response.send_message("✅ Configuration réinitialisée.", ephemeral=True)
 
+@bot.tree.command(name="delete", description="Supprimer tous les salons d'une catégorie")
+@app_commands.describe(category_id="L'ID de la catégorie à vider")
+async def cmd_delete(interaction: discord.Interaction, category_id: str):
+    if not await authorized(interaction.user.id):
+        await interaction.response.send_message("❌ Non autorisé.", ephemeral=True)
+        return
+    if not interaction.guild:
+        await interaction.response.send_message("❌ Commande réservée aux serveurs.", ephemeral=True)
+        return
+
+    try:
+        cat_id = int(category_id)
+    except ValueError:
+        await interaction.response.send_message("❌ ID invalide.", ephemeral=True)
+        return
+
+    category = interaction.guild.get_channel(cat_id)
+    if not category or not isinstance(category, discord.CategoryChannel):
+        await interaction.response.send_message("❌ Catégorie introuvable.", ephemeral=True)
+        return
+
+    await interaction.response.defer(ephemeral=True)
+
+    deleted = 0
+    errors  = 0
+    for channel in list(category.channels):
+        try:
+            await channel.delete(reason=f"Suppression via /delete par {interaction.user}")
+            deleted += 1
+        except Exception:
+            errors += 1
+
+    msg = f"✅ **{deleted}** salon(s) supprimé(s) dans **{category.name}**."
+    if errors:
+        msg += f"\n⚠️ **{errors}** salon(s) n'ont pas pu être supprimés (permissions manquantes)."
+    await interaction.followup.send(msg, ephemeral=True)
+
 def run():
     token = os.environ.get("BOT_TOKEN")
     if not token:
