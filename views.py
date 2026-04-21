@@ -79,9 +79,13 @@ def _message_panel_embed() -> discord.Embed:
         color=0x5865F2
     )
     e.add_field(name="1️⃣  Message texte simple",
-                value="Rédigez un message classique.", inline=False)
+                value="Rédigez un message classique.", inline=True)
+    e.add_field(name="\u200b", value="\u200b", inline=True)
+    e.add_field(name="\u200b", value="\u200b", inline=True)
     e.add_field(name="2️⃣  Embed personnalisé",
-                value="Créez un embed avec titre, description, bouton etc.", inline=False)
+                value="Créez un embed avec titre, description, bouton etc.", inline=True)
+    e.add_field(name="\u200b", value="\u200b", inline=True)
+    e.add_field(name="\u200b", value="\u200b", inline=True)
     e.add_field(name="💡 Astuce",
                 value="`{user}` → mention du membre\n`{user.id}` → id du membre\n`{timestamp}` → date/heure actuel",
                 inline=False)
@@ -140,10 +144,18 @@ def _embed_builder_embed() -> discord.Embed:
     e = discord.Embed(title="🎨  Créer un Embed",
                       description="Configurez votre embed étape par étape :",
                       color=0x5865F2)
-    e.add_field(name="1️⃣  Titre",          value="Définissez le titre de l'embed.",            inline=False)
-    e.add_field(name="2️⃣  Description",    value="Définissez la description de l'embed.",      inline=False)
-    e.add_field(name="3️⃣  Couleur & Image",value="Définissez la couleur et les images.",        inline=False)
-    e.add_field(name="4️⃣  Thumbnail",      value="Petite image affichée en haut à droite.",     inline=False)
+    e.add_field(name="1️⃣  Titre",           value="Définissez le titre de l'embed.",           inline=True)
+    e.add_field(name="\u200b", value="\u200b", inline=True)
+    e.add_field(name="\u200b", value="\u200b", inline=True)
+    e.add_field(name="2️⃣  Description",     value="Définissez la description de l'embed.",     inline=True)
+    e.add_field(name="\u200b", value="\u200b", inline=True)
+    e.add_field(name="\u200b", value="\u200b", inline=True)
+    e.add_field(name="3️⃣  Couleur & Image", value="Définissez la couleur et les images.",       inline=True)
+    e.add_field(name="\u200b", value="\u200b", inline=True)
+    e.add_field(name="\u200b", value="\u200b", inline=True)
+    e.add_field(name="4️⃣  Thumbnail",       value="Petite image affichée en haut à droite.",   inline=True)
+    e.add_field(name="\u200b", value="\u200b", inline=True)
+    e.add_field(name="\u200b", value="\u200b", inline=True)
     e.set_footer(text="by Ohio")
     return e
 
@@ -196,11 +208,13 @@ def _targets_embed() -> discord.Embed:
     e = discord.Embed(title="⚙️  Options de DM",
                       description="Choisissez une option pour récupérer les membres à qui envoyer des messages :",
                       color=0x5865F2)
-    e.add_field(name="1️⃣  Ajouter des IDs",   value="Permet d'ajouter un ou plusieurs IDs manuellement.",                         inline=False)
-    e.add_field(name="2️⃣  Fetch des membres", value="Récupère tous les membres du serveur (vous pouvez choisir le statut).",       inline=False)
-    e.add_field(name="3️⃣  Fetch par rôles",   value="Récupère les membres ayant certains rôles spécifiés.",                        inline=False)
-    e.add_field(name="4️⃣  Fetch Vocal",       value="Récupère sur les membres en vocal ou ceux pas en vocal.",                     inline=False)
-    e.add_field(name="5️⃣  Autres",            value="Affiche d'autres options.",                                                   inline=False)
+    e.add_field(name="1️⃣  Ajouter des IDs",   value="Permet d'ajouter un ou plusieurs IDs manuellement.",                   inline=True)
+    e.add_field(name="2️⃣  Fetch des membres", value="Récupère tous les membres du serveur.",                                 inline=True)
+    e.add_field(name="\u200b", value="\u200b", inline=True)
+    e.add_field(name="3️⃣  Fetch par rôles",   value="Récupère les membres ayant certains rôles spécifiés.",                  inline=True)
+    e.add_field(name="4️⃣  Fetch Vocal",       value="Récupère les membres en vocal.",                                        inline=True)
+    e.add_field(name="\u200b", value="\u200b", inline=True)
+    e.add_field(name="5️⃣  Autres",            value="Affiche d'autres options supplémentaires.",                             inline=False)
     e.set_footer(text="by Ohio")
     return e
 
@@ -339,9 +353,9 @@ class RoleFetchView(ui.View):
 def _dmall_type_embed() -> discord.Embed:
     e = discord.Embed(title="🚀  Choix du type de DMall",
                       description="Choisissez une méthode de DMall :", color=0x5865F2)
-    e.add_field(name="1️⃣  DMall Normal",  value="Envoi classique.", inline=False)
-    e.add_field(name="2️⃣  DMall Eco ⭐",  value="Utilise 1 bot à la fois, passe au suivant si banni.", inline=False)
-    e.add_field(name="3️⃣  DMall Custom ⭐", value="Envoi avec un délai personnalisé entre chaque message.", inline=False)
+    e.add_field(name="1️⃣  DMall Normal",    value="Envoi classique.",                                        inline=True)
+    e.add_field(name="2️⃣  DMall Eco ⭐",    value="1 bot à la fois, switch auto si banni.",                  inline=True)
+    e.add_field(name="3️⃣  DMall Custom ⭐", value="Délai personnalisé entre chaque message.",                 inline=True)
     e.set_footer(text="by Ohio")
     return e
 

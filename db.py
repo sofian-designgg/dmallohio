@@ -54,21 +54,30 @@ async def make_embed():
         color=0x5865F2
     )
     nb_tok = len(cfg.get("tokens", []))
+    msg    = cfg.get("message", "")
+    emb    = cfg.get("embed", {})
+    ids    = len(cfg.get("user_ids", []))
+    ign    = len(cfg.get("ignore_ids", []))
+    delay  = cfg.get("dm_options", {}).get("delay", 1.5)
+
+    # Ligne 1 : Tokens | Message
     e.add_field(name="🤖 Tokens",
-                value=f"`{nb_tok}` token(s)" if nb_tok else "*Aucun token ajouté*", inline=False)
-    msg = cfg.get("message", "")
+                value=f"`{nb_tok}` token(s)" if nb_tok else "*Aucun token*", inline=True)
     e.add_field(name="📩 Message",
-                value=f"```{msg[:80]}{'...' if len(msg)>80 else ''}```" if msg else "*Aucun message défini*",
-                inline=False)
-    emb = cfg.get("embed", {})
+                value=f"```{msg[:50]}{'...' if len(msg)>50 else ''}```" if msg else "*Aucun message*",
+                inline=True)
+    e.add_field(name="\u200b", value="\u200b", inline=True)
+
+    # Ligne 2 : Embed | User IDs | Ignorer
     e.add_field(name="📝 Embed",
-                value=f"`{emb.get('title','')[:60]}`" if emb.get("enabled") else "*Aucun embed défini*",
-                inline=False)
-    ids   = len(cfg.get("user_ids", []))
-    ign   = len(cfg.get("ignore_ids", []))
-    delay = cfg.get("dm_options", {}).get("delay", 1.5)
-    e.add_field(name="👤 User IDs",      value=f"Total : **{ids} ID**",  inline=True)
-    e.add_field(name="🚫 IDs à Ignorer", value=f"Total : **{ign} ID**",  inline=True)
+                value=f"`{emb.get('title','')[:40]}`" if emb.get("enabled") else "*Aucun embed*",
+                inline=True)
+    e.add_field(name="👤 User IDs",      value=f"**{ids}** ID",          inline=True)
+    e.add_field(name="🚫 IDs Ignorés",   value=f"**{ign}** ID",          inline=True)
+
+    # Ligne 3 : Options DM
     e.add_field(name="⚙️ Options de DM", value=f"Délai : **{delay}s**",  inline=True)
+    e.add_field(name="\u200b", value="\u200b", inline=True)
+    e.add_field(name="\u200b", value="\u200b", inline=True)
     e.set_footer(text="by Ohio")
     return e
